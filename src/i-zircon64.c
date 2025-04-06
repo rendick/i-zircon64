@@ -33,6 +33,31 @@ xcb_window_t window;
 xcb_generic_event_t *event;
 xcb_keysym_t keysym;
 
+int key_position = 0;
+int cursor_position = 0;
+
+void cursor() {
+  if (keysym == 65361) {
+    if (cursor_position > 0) {
+      cursor_position--;
+    }
+  } else if (keysym == 65363) {
+    if (cursor_position < key_position) {
+      cursor_position++;
+    }
+  } else if (32 <= keysym && 126 >= keysym) {
+    cursor_position = key_position;
+  }
+
+  int X_MOVE = 10 + cursor_position * 6;
+
+  xcb_image_text_8(connection, strlen("|"), window, gc, X_MOVE, WIN_HEIGHT / 10,
+                   "|");
+
+  printf("Key position: %d, Cursor position: %d\n", key_position,
+         cursor_position);
+}
+
 void list_of_files() {
   int files_count = 0;
   struct dirent *de;
@@ -51,9 +76,9 @@ void list_of_files() {
       if (9 == (char)keysym && 1 == files_count) {
         xcb_image_text_8(connection, strlen(de->d_name), window, gc, 10,
                          WIN_HEIGHT / 10, de->d_name);
-        memset(buffer, 0, sizeof(buffer));
         snprintf(buffer, sizeof(buffer), "%s", de->d_name);
-        printf("%s\n", buffer);
+        printf("LIST: %s\n", buffer);
+        key_position = strlen(de->d_name);
       }
     } else if (0 == strlen(buffer)) {
       xcb_image_text_8(connection, strlen(de->d_name), window, gc, 10,
@@ -120,7 +145,6 @@ void init() {
 
   xcb_key_symbols_t *keysyms = xcb_key_symbols_alloc(connection);
 
-  int key_position = 0;
   int arguments = 0;
   int status = 0;
 
@@ -149,6 +173,10 @@ void init() {
                       circle_values[i][4], circle_values[i][5]);
         }
       }
+
+      list_of_files();
+      cursor();
+
       xcb_flush(connection);
 
       break;
@@ -164,10 +192,11 @@ void init() {
       } else {
         switch (keysym) {
         case XK_BackSpace:
-          if (0 < key_position) {
-            key_position--;
-            buffer[key_position] = '\0';
-            printf("%s\n", buffer);
+          if (key_position > 0) {
+            memmove(&buffer[cursor_position - 1],
+                    &buffer[(cursor_position - 1) + 1], strlen(buffer));
+            key_position -= 1;
+            cursor_position -= 1;
           }
           break;
 
@@ -217,6 +246,7 @@ void init() {
                        WIN_HEIGHT / 10, buffer);
 
       list_of_files();
+      cursor();
 
       xcb_flush(connection);
 
@@ -233,5 +263,5 @@ void init() {
 int main(void) {
   init();
 
-  return 0;
+  return EXIT_SUCCESS;
 }
